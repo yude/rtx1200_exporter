@@ -1,16 +1,70 @@
 #!./upload.sh
 --[[
 Prometheus exporter for RTX1200
-
 lua /rtx1200_exporter.lua
 show status lua
-
 schedule at 1 startup * lua /rtx1200_exporter.lua 
 ]]
 -- vim:fenc=cp932
 
 
 -- start prometheus exporter
+
+function nattbl_info_alder(str, num)
+	local result, n
+	local ptn = "%s+%d+%s+(%d+%.%d+%.%d+%.%d+)%s+(%d+)"
+	local t = {}
+	
+	n = 1
+	for k, v in string.gmatch(str, ptn) do
+		t[n] = {k, v}
+	
+		if (n + 1 > num) then
+			break
+		end
+		n = n + 1
+	end
+	
+	if (n < num) then
+		num = n
+	end
+	
+	for i, v in ipairs(t) do
+		if (v[1] == "192.168.100.80") then
+			result = v[2]
+		end
+	end
+	
+	return result
+end
+
+function nattbl_info_pi(str, num)
+	local result, n
+	local ptn = "%s+%d+%s+(%d+%.%d+%.%d+%.%d+)%s+(%d+)"
+	local t = {}
+	
+	n = 1
+	for k, v in string.gmatch(str, ptn) do
+		t[n] = {k, v}
+	
+		if (n + 1 > num) then
+			break
+		end
+		n = n + 1
+	end
+	
+	if (n < num) then
+		num = n
+	end
+	
+	for i, v in ipairs(t) do
+		if (v[1] == "192.168.100.70") then
+			result = v[2]
+		end
+	end
+	
+	return result
+end
 
 tcp = rt.socket.tcp()
 tcp:setoption("reuseaddr", true)
@@ -59,8 +113,8 @@ while 1 do
 
 			local ok, result = rt.command("show environment")
 			if not ok then error("command failed") end
-			local cpu5sec, cpu1min, cpu5min, memused = string.match(result, /CPU:\s*(\d+)%\(5sec\)\s*(\d+)%\(1min\)\s*(\d+)%\(5min\)\s*ƒƒ‚ƒŠ:\s*(\d+)% used/)
-			local temperature = string.match(result, /âž‘Ì“à‰·“x\(.*\): (\d+)/)
+			local cpu5sec, cpu1min, cpu5min, memused = string.match(result, /CPU:\s*(\d+)%\(5sec\)\s*(\d+)%\(1min\)\s*(\d+)%\(5min\)\s*ãƒ¡ãƒ¢ãƒª:\s*(\d+)% used/)
+			local temperature = string.match(result, /ç­ä½“å†…æ¸©åº¦\(.*\): (\d+)/)
 			local luacount = collectgarbage("count")
 
 			local sent, err = control:send(
@@ -88,8 +142,8 @@ while 1 do
 			for n = 1, 3 do
 				local ok, result = rt.command($"show status lan${n}")
 				if not ok then error("command failed") end
-				local txpackets, txoctets = string.match(result, /‘—MƒpƒPƒbƒg:\s*(\d+)\s*ƒpƒPƒbƒg\((\d+)\s*ƒIƒNƒeƒbƒg\)/)
-				local rxpackets, rxoctets = string.match(result, /ŽóMƒpƒPƒbƒg:\s*(\d+)\s*ƒpƒPƒbƒg\((\d+)\s*ƒIƒNƒeƒbƒg\)/)
+				local txpackets, txoctets = string.match(result, /é€ä¿¡ãƒ‘ã‚±ãƒƒãƒˆ:\s*(\d+)\s*ãƒ‘ã‚±ãƒƒãƒˆ\((\d+)\s*ã‚ªã‚¯ãƒ†ãƒƒãƒˆ\)/)
+				local rxpackets, rxoctets = string.match(result, /å—ä¿¡ãƒ‘ã‚±ãƒƒãƒˆ:\s*(\d+)\s*ãƒ‘ã‚±ãƒƒãƒˆ\((\d+)\s*ã‚ªã‚¯ãƒ†ãƒƒãƒˆ\)/)
 				local sent, err = control:send(
 					$"ifOutOctets{if=\"${n}\"} ${txoctets}\n"..
 					$"ifInOctets{if=\"${n}\"} ${rxoctets}\n"..
@@ -99,27 +153,11 @@ while 1 do
 				if err then error(err) end
 			end
 
-			local ok, result = rt.command("show ip connection summary")
-			local v4session, v4channel = string.match(result, /Total Session: (\d+)\s+Total Channel:\s*(\d+)/)
-
-			local ok, result = rt.command("show ipv6 connection summary")
-			local v6session, v6channel = string.match(result, /Total Session: (\d+)\s+Total Channel:\s*(\d+)/)
-
-			local sent, err = control:send(
-				"# TYPE ipSession counter\n"..
-				$"ipSession{proto=\"v4\"} ${v4session}\n"..
-				$"ipSession{proto=\"v6\"} ${v6session}\n"..
-				"# TYPE ipChannel counter\n"..
-				$"ipChannel{proto=\"v4\"} ${v4channel}\n"..
-				$"ipChannel{proto=\"v6\"} ${v6channel}\n"
-			)
-			if err then error(err) end
-
 			local ok, result = rt.command("show status dhcp")
-			local dhcptotal = string.match(result, /‘SƒAƒhƒŒƒX”:\s*(\d+)/)
-			local dhcpexcluded = string.match(result, /œŠOƒAƒhƒŒƒX”:\s*(\d+)/)
-			local dhcpassigned = string.match(result, /Š„‚è“–‚Ä’†ƒAƒhƒŒƒX”:\s*(\d+)/)
-			local dhcpavailable = string.match(result, /—˜—p[^:]+?ƒAƒhƒŒƒX”:\s*(\d+)/)
+			local dhcptotal = string.match(result, /å…¨ã‚¢ãƒ‰ãƒ¬ã‚¹æ•°:\s*(\d+)/)
+			local dhcpexcluded = string.match(result, /é™¤å¤–ã‚¢ãƒ‰ãƒ¬ã‚¹æ•°:\s*(\d+)/)
+			local dhcpassigned = string.match(result, /å‰²ã‚Šå½“ã¦ä¸­ã‚¢ãƒ‰ãƒ¬ã‚¹æ•°:\s*(\d+)/)
+			local dhcpavailable = string.match(result, /åˆ©ç”¨[^:]+?ã‚¢ãƒ‰ãƒ¬ã‚¹æ•°:\s*(\d+)/)
 			local sent, err = control:send(
 				"# TYPE ipDhcp gauge\n"..
 				$"ipDhcp{} ${dhcptotal}\n"..
@@ -127,6 +165,20 @@ while 1 do
 				$"ipDhcp{type=\"assigned\"} ${dhcpassigned}\n"..
 				$"ipDhcp{type=\"available\"} ${dhcpavailable}\n"
 			)
+			if err then error(err) end
+			
+			local ok, result = rt.command("show nat descriptor address")
+			local allCount = string.match(result, "(%d+)å€‹ä½¿ç”¨ä¸­")
+			local alderCount = nattbl_info_alder(result, 20)
+			local piCount = nattbl_info_pi(result, 20)
+			
+			local sent, err = control:send(
+				"# TYPE natDescriptor counter\n"..
+				$"allCount{} ${allCount}\n"..
+				$"alderCount{} ${alderCount}\n"..
+				$"piCount{} ${piCount}\n"
+			)
+			
 			if err then error(err) end
 
 		elseif string.find(request, "GET / ") == 1 then
